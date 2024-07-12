@@ -84,7 +84,7 @@ func routes(e *echo.Echo, cache *groupcache.Group, pool *groupcache.HTTPPool) {
 		return nil
 	})
 
-	e.PUT("/_groupcache/*path", func(c echo.Context) error {
+	e.DELETE("/_groupcache/*path", func(c echo.Context) error {
 		pool.ServeHTTP(c.Response(), c.Request())
 		return nil
 	})
