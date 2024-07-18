@@ -43,16 +43,22 @@ func routes(e *echo.Echo, cache *groupcache.Group, pool *groupcache.HTTPPool) {
 		fmt.Printf("Server 4 :: timeWindow %v \n", timeWindow)
 
 		// is limit crossed
-		if rateLimit.Count > ALLOWED_LIMIT && timeWindow <= WINDOW {
+		if rateLimit.Count >= ALLOWED_LIMIT && timeWindow <= WINDOW {
 			return c.String(http.StatusForbidden, "Server 4 :: Too many request")
 		}
 
 		// is timeWindow expired, then reset
 		if timeWindow > WINDOW {
 			fmt.Printf("Server 4 :: expired %v \n", rateLimit)
-			err := cache.Remove(ctx, key)
+
+			// reset the counter, and update
+			rateLimit.Count = 1
+			rateLimit.StartTime = time.Now().Unix()
+			bs, _ := json.Marshal(rateLimit)
+
+			err := cache.Set(ctx, key, bs, time.Now().Add(TIME_TO_LIVE), true)
 			if err != nil {
-				fmt.Printf("Server 4 :: error while removing cache %v \n", err)
+				fmt.Printf("Server 4 :: error while reseting cache %v \n", err)
 			}
 		} else {
 
