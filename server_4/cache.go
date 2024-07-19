@@ -6,22 +6,26 @@ import (
 	"time"
 
 	"github.com/mailgun/groupcache/v2"
+	"github.com/spf13/cast"
 )
 
 const (
-	CACHE_SIZE   = 1 << 20 // 1 MB
-	CACHE_NAME   = "group_cache"
-	TIME_TO_LIVE = 2 * time.Minute
+	CACHE_SIZE = 1 << 20 // 1 MB
+	CACHE_NAME = "group_cache"
+)
+
+var (
+	TIME_TO_LIVE time.Duration = cast.ToDuration("2m") // duration
 )
 
 type RateLimit struct {
-	Key       string
-	Count     int
-	StartTime int64
+	Key      string
+	Count    int
+	EpiredAt time.Time
 }
 
-func fetchFromDatabase(key string) *RateLimit {
-	return &RateLimit{Key: key, Count: 0, StartTime: time.Now().Unix()}
+func initiateRateLimit(key string) *RateLimit {
+	return &RateLimit{Key: key, Count: 0, EpiredAt: time.Now().Local().Add(TIME_TO_LIVE)}
 }
 
 var (
@@ -35,9 +39,10 @@ func InitializeCache(self string) (*groupcache.Group, *groupcache.HTTPPool) {
 
 	cache := groupcache.NewGroup(CACHE_NAME, CACHE_SIZE, groupcache.GetterFunc(
 		func(ctx context.Context, key string, dest groupcache.Sink) error {
-			data := fetchFromDatabase(key)
+			// if cache missed, then initiate new rate limit
+			data := initiateRateLimit(key)
 			bs, _ := json.Marshal(data)
-			return dest.SetBytes(bs, time.Now().Add(TIME_TO_LIVE))
+			return dest.SetBytes(bs, data.EpiredAt)
 		}))
 
 	return cache, pool
